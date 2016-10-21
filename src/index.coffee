@@ -61,9 +61,13 @@ class VuePlugin
             # remove leading 'state.' from keypath (if it exists)
             keypath = binding.expression.substring binding.expression.indexOf('.')+1 if /^state\./.test binding.expression
             store = vnode.context.store # bind to component DMStore instance
-            el.addEventListener 'input', (event) ->
+            event_type = if el.tagName.toLowerCase() is 'input' and el.type.toLowerCase() is 'text' then 'input' else 'change'
+            el.addEventListener event_type, (event) ->
               # update component state with changed <INPUT> value
-              store.mutate_value keypath, event.target.value
+              value = switch el.type.toLowerCase()
+                when 'checkbox' or 'radio' then event.target.checked
+                else event.target.value
+              store.mutate_value keypath, value
       created: () ->
         state = @$options.store # root state object is passed in via STORE option on Vue instance
         if state?
