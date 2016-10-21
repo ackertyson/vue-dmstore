@@ -34,7 +34,7 @@ Vue.extend # TICKET component...
       items: []
       selected: {}
   created: () ->
-    @store = @$dm_store.attach 'ticket', @state
+    @store = @$dmstore.attach 'ticket', @state
   mounted: () ->
     Ticket.fetch_all().then (tickets) =>
       # 'init' methods skip change detection...
