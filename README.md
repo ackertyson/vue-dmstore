@@ -14,6 +14,7 @@ Vue.use new DMStore
 new Vue().$mount('#app')
 
 Vue.extend # TICKET component...
+  name: 'Ticket'
   template: '.ticket'
   data: ->
     state: {} # placeholder for DMStore component state
@@ -27,6 +28,8 @@ Vue.extend # TICKET component...
 ...and in the template (notice the custom MODEL attribute!)....
 ```
 .ticket
+  label Date
+  input(type="text", v-state-model="state.date")
   label Location
   input(type="text", v-state-model="state.location")
 ```

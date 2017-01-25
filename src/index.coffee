@@ -71,6 +71,7 @@ class VuePlugin
             keypath = binding.expression
             store = vnode.context.store.app # bind to component DMStore instance
             state = vnode.context._dmstate
+            component_state = vnode.context.state
             el.value = store._get_deep vnode.context, keypath # set initial <INPUT> value
             event_type = if el.tagName.toLowerCase() is 'input' and el.type.toLowerCase() is 'text' then 'input' else 'change'
             el.addEventListener event_type, (event) ->
@@ -81,6 +82,11 @@ class VuePlugin
               dot = keypath.indexOf '.'
               keypath = keypath.substring(dot+1) if dot > -1
               store.mutate_value keypath, value
+              store._set_deep component_state, keypath, value
+
+      methods:
+        clean: ->
+          delete @$root.store.state[@dmstore_uuid]._dirty
 
       created: ->
         if @$parent? and @state? # Vue component with defined STATE data property
