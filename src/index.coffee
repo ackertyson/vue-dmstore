@@ -1,32 +1,44 @@
+uuid = require 'uuid/v4'
 unless window?.Vue? # Vue is loaded in <SCRIPT> tag; don't try 'require' it
   Vue = require 'vue'
 hs = require './helpers'
 
 class DMStore
-  @state: {} # static property shared between all instances
+  constructor: (@name) ->
 
-  constructor: (state, @name) ->
-    @c = @constructor
-    if @name? # child store (from Vue component)
-      if @c.state[@name]?
-        @c.state[@name] = state # mount child state on root
-      else
-        throw new Error "No state found for <#{@name}> component; did you forget to add the '#{@name}' key to the Vue instance DATA property?"
-    else # root store (from Vue instance)
-      @c.state = state # initialize root state object
+  attach: (@state) ->
 
-  _mutate: (selector, state, value, track_changes) => # SELECTOR may be simple string or dot-notation keypath
-    substate = state
-    selector_array = selector.split '.'
-    selector_array.forEach (key, index) =>
-      if index is selector_array.length-1 # last keypath key; set value
-        substate[key] = value
-        state._dirty = if hs.typeof(track_changes) is 'boolean' then track_changes else true
-      else # recurse another level into STATE
-        if substate[key]?
-          substate = substate[key]
+  _get_deep: (object, keypath) ->
+    keys = keypath.split '.'
+    sub = object
+    for key, index in keys
+      if index is keys.length-1 # last keypath key; return value
+        return sub[key]
+      else # recurse another level
+        if sub[key]?
+          sub = sub[key]
         else
-          throw new Error "No such property '#{selector}' in <#{@name}> component state object"
+          return
+
+  _set_deep: (object, keypath, value) ->
+    keys = keypath.split '.'
+    sub = object
+    for key, index in keys
+      if index is keys.length-1 # last keypath key; set value
+        sub[key] = value
+        return true
+      else # recurse another level
+        if sub[key]?
+          sub = sub[key]
+        else
+          return false
+
+  _mutate: (selector, value, track_changes) => # SELECTOR may be simple string or dot-notation keypath
+    set = @_set_deep @state, selector, value
+    if set
+      @state._dirty = if hs.typeof(track_changes) is 'boolean' then track_changes else true
+    else
+      throw new Error "No such property '#{selector}' in <#{@name}> component state object"
 
   init_collection: (selector, data, key='_id') =>
     @mutate_collection selector, data, key, false
@@ -37,43 +49,59 @@ class DMStore
   mutate_collection: (selector, data, key='_id', track_changes) =>
     m = new Map
     m.set item[key], item for item in data
-    @_mutate selector, @c.state[@name], m, track_changes
+    @_mutate selector, m, track_changes
 
   mutate_value: (selector, data, track_changes) => # apply mutations to state
-    @_mutate selector, @c.state[@name], data, track_changes
+    @_mutate selector, data, track_changes
 
 
 class VuePlugin
   constructor: ->
 
-  attach: (name, state) -> # instantiate child DMStore (from Vue component)
-    child = new DMStore state, name
-    child
-
   install: (Vue, options) ->
     Vue.mixin
       data: () ->
-        dmstate: {} # initialize root state object on Vue instance
+        _dmstate: {}
+        store: {}
+        dmstore_uuid: uuid()
+
       directives:
         'state-model': # provide attribute directive to replace V-MODEL
-          update: (el, binding, vnode) ->
-            el.value = binding.value # set initial <INPUT> value
-            # remove leading 'state.' from keypath (if it exists)
-            keypath = binding.expression.substring binding.expression.indexOf('.')+1 if /^state\./.test binding.expression
-            store = vnode.context.store # bind to component DMStore instance
+          bind: (el, binding, vnode) ->
+            keypath = binding.expression
+            store = vnode.context.store.app # bind to component DMStore instance
+            state = vnode.context._dmstate
+            el.value = store._get_deep vnode.context, keypath # set initial <INPUT> value
             event_type = if el.tagName.toLowerCase() is 'input' and el.type.toLowerCase() is 'text' then 'input' else 'change'
             el.addEventListener event_type, (event) ->
               # update component state with changed <INPUT> value
               value = switch el.type.toLowerCase()
                 when 'checkbox' or 'radio' then event.target.checked
                 else event.target.value
+              dot = keypath.indexOf '.'
+              keypath = keypath.substring(dot+1) if dot > -1
               store.mutate_value keypath, value
-      created: () ->
-        state = @$options.store # root state object is passed in via STORE option on Vue instance
-        if state?
-          store = new DMStore state # instantiate root DMStore
-          Vue.set @, 'dmstate', DMStore.state # mount the (static!) state object and make it reactive
-    Vue::$dmstore = @
+
+      created: ->
+        if @$parent? and @state? # Vue component with defined STATE data property
+          name = @$options.name or 'unnamed'
+          dm = new DMStore name
+          @$root.store.state[@dmstore_uuid] = {}
+          dm.attach @$root.store.state[@dmstore_uuid]
+          Vue.set @store, 'app', dm
+        else # root Vue instance
+          Vue.set @store, 'state', {}
+
+      destroyed: ->
+        return unless @$parent? # skip for root Vue instance
+        delete @$root.store.state[@dmstore_uuid]
+
+      mounted: ->
+        return unless @$parent? # skip for root Vue instance
+        return unless @state? # skip if component has no STATE property
+        for own k,v of @state
+          @$root.store.state[@dmstore_uuid][k] = v
+        @_dmstate = @$root.store.state[@dmstore_uuid]
 
 
 module.exports = VuePlugin
