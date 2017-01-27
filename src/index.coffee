@@ -72,21 +72,27 @@ class VuePlugin
             store = vnode.context.store.app # bind to component DMStore instance
             state = vnode.context._dmstate
             component_state = vnode.context.state
-            el.value = store._get_deep vnode.context, keypath # set initial <INPUT> value
-            event_type = if el.tagName.toLowerCase() is 'input' and el.type.toLowerCase() is 'text' then 'input' else 'change'
+            if el.tagName.toLowerCase() is 'input' and el.type.toLowerCase() is 'text'
+              event_type = 'input'
+              value_key = 'value'
+            else
+              event_type = 'change'
+              value_key = 'checked'
+            el[value_key] = store._get_deep vnode.context, keypath # set <INPUT> initial value
+
             el.addEventListener event_type, (event) ->
               # update component state with changed <INPUT> value
-              value = switch el.type.toLowerCase()
-                when 'checkbox' or 'radio' then event.target.checked
-                else event.target.value
+              value = event.target[value_key]
               dot = keypath.indexOf '.'
-              keypath = keypath.substring(dot+1) if dot > -1
-              store.mutate_value keypath, value
-              store._set_deep component_state, keypath, value
+              keypath = keypath.substring(dot+1) if dot > -1 # trim leading 'property.'
+              store.mutate_value keypath, value # update central state
+              store._set_deep component_state, keypath, value # update component STATE
+
 
       methods:
         clean: ->
           delete @$root.store.state[@dmstore_uuid]._dirty
+
 
       created: ->
         if @$parent? and @state? # Vue component with defined STATE data property
@@ -98,9 +104,11 @@ class VuePlugin
         else # root Vue instance
           Vue.set @store, 'state', {}
 
+
       destroyed: ->
         return unless @$parent? # skip for root Vue instance
         delete @$root.store.state[@dmstore_uuid]
+
 
       mounted: ->
         return unless @$parent? # skip for root Vue instance
