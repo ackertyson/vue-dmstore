@@ -75,7 +75,7 @@ class VuePlugin
             if el.tagName.toLowerCase() is 'input' and el.type.toLowerCase() is 'text'
               event_type = 'input'
               value_key = 'value'
-            else
+            else # radio/checkbox
               event_type = 'change'
               value_key = 'checked'
             el[value_key] = store._get_deep vnode.context, keypath # set <INPUT> initial value
@@ -91,14 +91,14 @@ class VuePlugin
 
       methods:
         clean: ->
-          delete @$root.store.state[@dmstore_uuid]._dirty
+          @$root.store.state[@dmstore_uuid]._dirty = false
 
 
       created: ->
         if @$parent? and @state? # Vue component with defined STATE data property
           name = @$options.name or 'unnamed'
           dm = new DMStore name
-          @$root.store.state[@dmstore_uuid] = {}
+          @$root.store.state[@dmstore_uuid] = { _dirty: false }
           dm.attach @$root.store.state[@dmstore_uuid]
           Vue.set @store, 'app', dm
         else # root Vue instance
@@ -115,6 +115,7 @@ class VuePlugin
         return unless @state? # skip if component has no STATE property
         for own k,v of @state
           @$root.store.state[@dmstore_uuid][k] = v
+          @$root.store.state[@dmstore_uuid]._dirty = false
         @_dmstate = @$root.store.state[@dmstore_uuid]
 
 
