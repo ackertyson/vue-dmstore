@@ -90,8 +90,8 @@ class VuePlugin
 
 
       methods:
-        clean: ->
-          @$root.store.state[@dmstore_uuid]._dirty = false
+        clean: -> # skip if element has already been removed from DOM
+          @$root.store.state[@dmstore_uuid]?._dirty = false
 
 
       created: ->
