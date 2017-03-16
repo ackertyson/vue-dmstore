@@ -1,12 +1,12 @@
-#DM Store
+# DM Store
 
 Vue plugin providing simple centralized state management
 
-##INSTALLATION
+## INSTALLATION
 
 `npm i --save vue-dmstore`
 
-##USAGE
+## USAGE
 ```
 DMStore = require 'vue-dmstore'
 Vue.use new DMStore
